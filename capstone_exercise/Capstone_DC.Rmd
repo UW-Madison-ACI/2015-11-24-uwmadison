@@ -1,0 +1,221 @@
+---
+title: "Data Carpentry Capstone"
+author: "Naupaka Zimmerman"
+date: "January 12, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Using this, we can set a chunk option for all chunks.
+# In this case we don't want to show any code, so this sets 
+# echo = FALSE for all chunks unless we set it manually to TRUE
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Task 1: Load the data from a SQLite database
+
+```{r load-packages-and-data, message = FALSE}
+# message = FALSE above turns off unwanted output messages about loaded packages
+
+# If needed:
+# install.packages("dplyr", dependencies = TRUE)
+
+# The knitr package includes the function kable(), which allows us to format
+# tables nicely in our output. The package tidyr includes functions to reformat
+# tables from long to wide (see Data Wrangling cheatsheet for details).
+
+# If needed:
+# install.packages("knitr", dependencies = TRUE)
+# install.packages("tidyr", dependencies = TRUE)
+
+# load packages
+library("dplyr")
+library("knitr")
+library("tidyr")
+
+# 1. Write an Rmd script to load the Portal data from your sqlite database.
+
+################################
+# Get data frame from database #
+################################
+
+# Set type and location of database
+# This database is also available on figshare at
+# https://dx.doi.org/10.6084/m9.figshare.1314459
+portal_db <- src_sqlite("data/raw/UWM_DC_portal.sqlite")
+
+# Configure SQL query to pull fully joined data from database
+to_analyze <- tbl(portal_db, 
+				  sql("SELECT sur.*, sp.genus, sp.species, sp.taxa, pl.plot_type
+						FROM surveys AS sur
+							 JOIN plots AS pl ON sur.plot_id = pl.plot_id
+							 JOIN species AS sp ON sp.species_id = sur.species_id
+						ORDER BY sur.record_id ASC"))
+
+# Retrieve all data resulting from query into R data frame
+collected_data <- collect(to_analyze)
+```
+
+```{r display-data-head-as-table}
+# Display a small subset fo the data so we know it worked
+# and to get a sense for what the data look like
+kable(head(collected_data)[1:10], caption = "The first 10 columns of the first few rows of our dataset.")
+```
+
+## Task 2: Box plots of weight
+
+```{r calc-means-by-sex}
+# create summary data of means by gender for M and F animals
+# Subset in case genders other than "M" or "F" are present
+mean.weight.by.sex <- collected_data %>% 
+    filter(sex == "M" | sex == "F") %>% 
+    group_by(sex) %>% 
+    summarise(mean = mean(weight, na.rm = TRUE))
+
+# Calculate mean weight across all males, round the result to 2 decimal places
+male.mean.weight <- mean.weight.by.sex %>% 
+    filter(sex == "M") %>% 
+    select(mean)
+male.mean.weight <- round(male.mean.weight, 3)
+
+# Calculate mean weight across all females, round the result to 2 decimal places
+female.mean.weight <- mean.weight.by.sex %>% 
+    filter(sex == "F") %>% 
+    select(mean)
+female.mean.weight <- round(female.mean.weight, 2)
+```
+
+```{r means-t-test}
+# Calculate difference between the means with a t-test
+# If this is significant, then say so in the markdown text below
+# If not, then change to state that it is not significant
+# Filter in case genders other than "M" or "F" are present
+sex_filtered_data <- collected_data %>%
+    filter(sex == "M" | sex == "F") %>%
+    select(weight, sex)
+
+weight.ttest <- t.test(weight ~ sex, data = sex_filtered_data, na.rm = TRUE)
+```
+
+As you can see in the following figure, the average weight in grams for male species measured was `r male.mean.weight` and for females it was `r female.mean.weight`. This `r if (weight.ttest$p.value < 0.05){"is"} else{"is not"}` a statistically significant difference (p = `r round(weight.ttest$p.value, 2)`).
+
+```{r boxplot-by-sex}
+boxplot(weight ~ sex, data = sex_filtered_data, xlab = "Sex", ylab = "Weight in grams")
+```
+
+## Task 3: Histogram of all hindfoot lengths
+
+```{r histogram-hindfoot-lengths}
+hist(collected_data$hindfoot_length,
+	 main = "Histogram of highfoot lengths of all species combined",
+	 xlab = "Highfoot length in mm")
+```
+
+## Task 4: Scatterplots of weight by hindfoot length
+
+Choose three species. Make three scatterplot of weight (on x) vs hindfoot length for each, with different color points for each species.
+
+### Three selected species
+
+```{r choose-species}
+# Choose three species. The three species you set here
+# will determine which names are printed out and which 
+# species are used for the scatterplots below
+chosen.species <- c("DM", "DO", "DS")
+
+# These are the colors for the three scatterplots
+chosen.colors <- c("blue", "green", "purple")
+
+# This is to get a small table with the full Genus and species
+# for our chosen species_id codes
+species.names <- collected_data %>% 
+    filter(species_id %in% chosen.species) %>%
+    group_by(genus, species) %>% 
+    summarise()
+```
+
+* *`r paste(species.names$genus[1], species.names$species[1])`*
+* *`r paste(species.names$genus[2], species.names$species[2])`*
+* *`r paste(species.names$genus[3], species.names$species[3])`*
+
+```{r three-scatterplots-of-weight-by-hindfoot-length}
+# Subset and then plot the first species of interest
+scatter1 <- collected_data %>%
+	filter(species_id == chosen.species[1]) %>%
+	select(weight, hindfoot_length)
+
+plot(x = scatter1$weight,
+	 y = scatter1$hindfoot_length,
+	 xlab = "Weight in grams",
+	 ylab = "Hindfoot length in mm",
+	 col = chosen.colors[1],
+	 main = paste("Weight vs Hindfoot length for species", chosen.species[1]))
+
+# Subset and then plot the second species of interest
+scatter2 <- collected_data %>%
+	filter(species_id == chosen.species[2]) %>%
+	select(weight, hindfoot_length)
+
+plot(x = scatter2$weight,
+	 y = scatter2$hindfoot_length,
+	 xlab = "Weight in grams",
+	 ylab = "Hindfoot length in mm",
+	 col = chosen.colors[2],
+	 main = paste("Weight vs Hindfoot length for species", chosen.species[2]))
+
+# Subset and then plot the third species of interest
+scatter3 <- collected_data %>%
+	filter(species_id == chosen.species[3]) %>%
+	select(weight, hindfoot_length)
+
+plot(x = scatter3$weight,
+	 y = scatter3$hindfoot_length,
+	 xlab = "Weight in grams",
+	 ylab = "Hindfoot length in mm",
+	 col = chosen.colors[3],
+	 main = paste("Weight vs Hindfoot length for species", chosen.species[3]))
+
+```
+
+
+## Task 5: Counts for Species "DM"
+For the species code DM, use `dplyr` to calculate the total number of counts per year for each plot type.
+
+```{r number-of-DM-counts-by-year}
+# Count up or tally() the number of individuals per plot type
+# per year
+DM_counts_by_year_and_plot_type <- collected_data %>% 
+    filter(species_id == "DM") %>% 
+    group_by(year, plot_type) %>% 
+    tally()
+
+# We again use kable() to print out a nicely formatted table.
+# We also use the spread() function to make the table easier to read, 
+# with plot types across the top, and years down the side
+kable(spread(DM_counts_by_year_and_plot_type, plot_type, n))
+
+```
+
+## Task 6: Plot counts over time in "Rodent Exclosure" plots
+Using the data frame you just created, plot the counts (of the species "DM") over time as line graphs for the plot type “Rodent Exclosure”. Describe what you see.
+
+```{r counts-of-DM-over-time-rodent-exclosure}
+# Generate summary table of counts for species "DM" within "Rodent Exclosure"
+# plots over time
+DM_Rodent_Exclosure_by_year <- collected_data %>% 
+    filter(species_id == "DM" & plot_type == "Rodent Exclosure") %>% 
+    group_by(year) %>% 
+    tally()
+
+# Plot that data with a line graph
+plot(x = DM_Rodent_Exclosure_by_year$year, 
+	 y = DM_Rodent_Exclosure_by_year$n,
+	 type = "l",
+	 xlab = "Year",
+	 ylab = expression(paste("Count of ", italic("Dipodomys merriami"))))
+
+```
+
+It appears that the Rodent exclosure was effective at reducing counts of *Dipodomys merriami*, particularly after 1990.
+
+
