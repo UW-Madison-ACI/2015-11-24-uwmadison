@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE)
 ## Task 1: Load the data from a SQLite database
 
 ```{r load-packages-and-data, message = FALSE}
-# message = FALSE above turns of unwanted output messages about loaded packages
+# message = FALSE above turns off unwanted output messages about loaded packages
 
 # If needed:
 # install.packages("dplyr", dependencies = TRUE)
