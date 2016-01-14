@@ -191,7 +191,7 @@ DM_counts_by_year_and_plot_type <- collected_data %>%
 
 # We again use kable() to print out a nicely formatted table.
 # We also use the spread() function to make the table easier to read, 
-# with plto types across the top, and years down the side
+# with plot types across the top, and years down the side
 kable(spread(DM_counts_by_year_and_plot_type, plot_type, n))
 
 ```
